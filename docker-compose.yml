@@ -1,22 +1,52 @@
-version: '3.8'
+# =========================================================================
+# ORQUESTACIÓN DE CONTENEDORES PARA BALANCEO DE CARGA
+# =========================================================================
+# Este archivo define toda la infraestructura de red, servicios y 
+# dependencias necesarias para desplegar el proyecto mediante comandos simples.
+# 
+# Todos los contenedores descritos a continuación se comunicarán entre sí 
+# en una subred privada creada automáticamente por Docker.
 
 services:
+  # =======================================================================
+  # 1. EL PROXY INVERSO Y BALANCEADOR (Nginx)
+  # =======================================================================
   nginx:
+    # Usamos la última imagen oficial de Nginx
     image: nginx:latest
     container_name: nginx_proxy
+    
+    # "ports" expone el servicio al mundo externo (El cliente/Navegador).
+    # "8080" es el puerto en nuestra máquina Windows Host.
+    # "80" es el puerto interno dentro del contenedor.
+    # Así evitamos colisiones por si el puerto 80 del Host ya estuviere en uso.
     ports:
       - "8080:80"
+      
+    # "volumes" inyecta archivos de nuestra PC (Host) dentro del contenedor.
+    # Le pasamos el "nginx.conf" que creamos para sobrescribir el default.
+    # El sufijo ":ro" (Read Only) protege el archivo de escritura interna.
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      
+    # "depends_on" obliga a que el proxy Nginx no intente encenderse
+    # hasta que los servidores de los cuales depende existan.
     depends_on:
       - apache1
       - apache2
       - apache3
 
+  # =======================================================================
+  # 2. LOS NODOS BACKEND (Servidores Web Apache "httpd")
+  # =======================================================================
+  # Tres instancias idénticas pero desconectadas entre sí. Nginx será 
+  # el único que conocerá sus IPs internas para despacharles tráfico.
+  
   apache1:
-    image: httpd:2.4
-    container_name: apache1_backend
+    image: httpd:2.4                  # Imagen oficial de Servidor Apache 2.4
+    container_name: apache1_backend   # Nombre fijo e identificativo del contenedor
     volumes:
+      # Sobrescribimos su página web por defecto con nuestro HTML de prueba.
       - ./apache1/index.html:/usr/local/apache2/htdocs/index.html:ro
 
   apache2:
